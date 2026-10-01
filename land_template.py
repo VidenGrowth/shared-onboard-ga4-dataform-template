@@ -19,7 +19,8 @@ Placeholders replaced in every text file (the template's workflow_settings.yaml)
 The output dataset is derived by the template itself (includes/constants.js).
 
   uv run land_template.py ./template-shared-ga4-dataform \
-      --source <project>.analytics_<property_id> --repo-location <repo-location>
+      --source <project>.analytics_<property_id> --repo-location <repo-location> \
+      --time-zone <time-zone>
       # add --bq-location <loc> if the source is not in US
 """
 from __future__ import annotations
@@ -29,6 +30,7 @@ import base64
 import pathlib
 import re
 import sys
+import zoneinfo
 
 import google.auth
 from google.auth.transport.requests import AuthorizedSession
@@ -36,6 +38,9 @@ from google.auth.transport.requests import AuthorizedSession
 DATAFORM = "https://dataform.googleapis.com/v1"
 BIGQUERY = "https://bigquery.googleapis.com/bigquery/v2"
 SKIP = {".git", ".github", "node_modules", ".df-credentials.json", ".DS_Store"}
+SETTINGS = "workflow_settings.yaml"
+TIME_ZONES = "https://docs.cloud.google.com/looker/docs/reference/param-view-timezone-values"
+CURRENCIES_RE = re.compile(r"^[A-Z]{3}(,[A-Z]{3})*$")
 SOURCE_RE = re.compile(r"^(?P<project>[a-z][a-z0-9-]{4,28}[a-z0-9])\.analytics_(?P<pid>\d+)$")
 
 
@@ -60,6 +65,22 @@ def collect(root: pathlib.Path, subs: dict[str, str]) -> dict[str, bytes]:
     if missing := sorted(subs.keys() - found):
         sys.exit(f"placeholders not found in template: {' '.join(missing)}")
     return files
+
+
+def var_re(key: str) -> re.Pattern:
+    return re.compile(rf"^(\s*{key}:)\s*(.*)$", re.M)
+
+
+def get_var(text: str, key: str) -> str:
+    m = var_re(key).search(text)
+    return m[2].strip("\"'") if m else "<not set>"
+
+
+def set_var(text: str, key: str, value: str) -> str:
+    text, n = var_re(key).subn(lambda m: f'{m[1]} "{value}"', text)
+    if not n:
+        sys.exit(f"{key} not found in {SETTINGS}")
+    return text
 
 
 def repo_files(s: AuthorizedSession, repo: str, path: str = "") -> list[str]:
@@ -111,6 +132,10 @@ def main() -> None:
     p.add_argument("--bq-location", default="US", help="BigQuery location (checked against source)")
     p.add_argument("--repo", help="default: ga4_data_processing_<property_id>")
     p.add_argument("--service-account", help="SA email that runs workflows (default: Dataform service agent)")
+    p.add_argument("--time-zone", help=f"GA4 property time zone, e.g. Europe/Berlin (default: template value); see {TIME_ZONES}")
+    p.add_argument("--add-rates", action=argparse.BooleanOptionalAction,
+                   help="join daily currency rates, US sources only (default: template value)")
+    p.add_argument("--rates-currencies", help="e.g. EUR,GBP,CHF (default: template value)")
     p.add_argument("--create", action=argparse.BooleanOptionalAction, default=True,
                    help="create repo if missing (default: on)")
     p.add_argument("--sync", action="store_true", help="delete files absent in template")
@@ -127,6 +152,14 @@ def main() -> None:
     df_project = a.project or data_project
     parent = f"projects/{df_project}/locations/{a.repo_location}"
     repo = f"{parent}/repositories/{repo_id}"
+    if a.time_zone:
+        try:
+            zoneinfo.ZoneInfo(a.time_zone)
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+            sys.exit(f"--time-zone must be a name like Europe/Berlin, got {a.time_zone!r}; see {TIME_ZONES}")
+    currencies = a.rates_currencies and a.rates_currencies.replace(" ", "").upper()
+    if currencies and not CURRENCIES_RE.match(currencies):
+        sys.exit(f"--rates-currencies must look like EUR,GBP,CHF, got {a.rates_currencies!r}")
 
     s, author, author_email = None, "<you>", "<your gcloud identity>"
     if not a.dry_run:
@@ -145,11 +178,21 @@ def main() -> None:
         "<GA4_DATASCHEMA>": ga4_dataset,
     }
     files = collect(a.template_dir, subs)
+    settings = files[SETTINGS].decode()
+    if a.time_zone:
+        settings = set_var(settings, "TIME_ZONE", a.time_zone)
+    if a.add_rates is not None:
+        settings = set_var(settings, "ADD_RATES", str(a.add_rates).lower())
+    if currencies:
+        settings = set_var(settings, "RATES_CURRENCIES", currencies)
+    files[SETTINGS] = settings.encode()
 
     print(f"source  {data_project}.{ga4_dataset}  ({a.bq_location})")
     print(f"output  {data_project}.{output_dataset}")
     print(f"repo    {repo}")
     print(f"author  {author} <{author_email}>")
+    print(f"tz      {get_var(settings, 'TIME_ZONE')}")
+    print(f"rates   {get_var(settings, 'ADD_RATES')}  ({get_var(settings, 'RATES_CURRENCIES')})")
     print(f"sa      {a.service_account or '<Dataform service agent>'}")
     print(f"files   {len(files)}")
     if a.dry_run:

@@ -10,8 +10,8 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 | Output dataset | `<project>.analytics_processed_data_<property_id>` |
 | Dataform repo ID | `ga4_data_processing_<property_id>` |
 | Dataform project | Same as the source project |
-| Dataform repo location | `us-central1` (change with `--repo-location`) |
-| BigQuery location | `US`, checked against the source dataset's actual location |
+| Dataform repo location | `us-central1` (change with `--repo-location`, see [Dataform locations](https://cloud.google.com/dataform/docs/locations)) |
+| BigQuery location | `US`, checked against the source dataset's actual location (see [BigQuery locations](https://cloud.google.com/bigquery/docs/locations)) |
 
 ## What the script does
 
@@ -55,13 +55,14 @@ The script fills these placeholders in the template's `workflow_settings.yaml`, 
 
 The output dataset `analytics_processed_data_<property_id>` is derived by the template from `GA4_DATASCHEMA`.
 
-Other settings are copied as they are in the template. Review them for each client and edit them in the Dataform repo after landing:
+Other settings are copied from the template unless a flag sets them. Review them for each client; anything without a flag is edited in the Dataform repo after landing:
 
 | Setting | Template value | Check |
 |---|---|---|
-| `TIME_ZONE` | `America/Los_Angeles` | Set to the GA4 property time zone |
+| `TIME_ZONE` | `America/Los_Angeles` | Set with `--time-zone` to the GA4 property time zone (GA4 Admin → Property details), using a [time zone name](https://docs.cloud.google.com/looker/docs/reference/param-view-timezone-values) |
 | `START_DATE` | `""` (full history) | Set a date to limit the first backfill |
-| `ADD_RATES` | `"true"` | Needs read access to `videnglobe.utilities.currency_rates` in the same BigQuery location; set `"false"` otherwise |
+| `ADD_RATES` | `"true"` | Needs read access to `videnglobe.utilities.currency_rates`, which is in `US`. Set with `--add-rates` / `--no-add-rates` |
+| `RATES_CURRENCIES` | `"EUR,GBP,CHF"` | Set with `--rates-currencies` |
 | `includes/params.json` | Example params (`event_category`, `src`, …) | Replace with the client's custom params |
 
 ### 3. Authenticate
@@ -77,6 +78,7 @@ cd shared-onboard-ga4-dataform-template
 uv run land_template.py ../template-shared-ga4-dataform \
   --source <project>.analytics_<property_id> \
   --repo-location <repo-location> \
+  --time-zone <time-zone> \
   --dry-run
 ```
 
@@ -87,7 +89,8 @@ Check the names it prints and the list of files.
 ```bash
 uv run land_template.py ../template-shared-ga4-dataform \
   --source <project>.analytics_<property_id> \
-  --repo-location <repo-location>
+  --repo-location <repo-location> \
+  --time-zone <time-zone>
 ```
 
 The repository is created if it does not exist yet (`--create` is on by default; pass `--no-create` to only update existing repos); otherwise a new commit is added on top. Add `--sync` to also delete repo files that are not in the template.
@@ -106,7 +109,8 @@ If the source dataset is not in `US`, the script stops before writing anything a
 ```bash
 cd ../template-shared-ga4-dataform && git pull && cd -
 uv run land_template.py ../template-shared-ga4-dataform \
-  --source <project>.analytics_<property_id> --repo-location <repo-location> --sync
+  --source <project>.analytics_<property_id> --repo-location <repo-location> \
+  --time-zone <time-zone> --sync
 ```
 
 This writes one new commit on top of the existing history.
@@ -122,6 +126,9 @@ This writes one new commit on top of the existing history.
 | `--repo` | `ga4_data_processing_<property_id>` | |
 | `--service-account` | Dataform service agent | Service account email that runs the repo's workflows |
 | `--create` / `--no-create` | on | Create the repo if it does not exist |
+| `--time-zone` | Template value (`America/Los_Angeles`) | Sets `TIME_ZONE`, e.g. `Europe/Berlin`. [Time zone names](https://docs.cloud.google.com/looker/docs/reference/param-view-timezone-values) |
+| `--add-rates` / `--no-add-rates` | Template value (`true`) | Sets `ADD_RATES`. The rates table is in `US`, so use `--no-add-rates` for other locations |
+| `--rates-currencies` | Template value (`EUR,GBP,CHF`) | Sets `RATES_CURRENCIES`, e.g. `EUR,GBP` |
 | `--sync` | off | Delete repo files that are not in the template |
 | `--dry-run` | off | Print the plan only |
 
