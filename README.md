@@ -17,7 +17,7 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 
 1. Reads the project and property ID from `--source` and builds all names from them.
 2. Looks up the source dataset in BigQuery and stops if its location differs from `--bq-location`.
-3. Detects your gcloud email, which is used as the commit author.
+3. Detects your gcloud email and uses it as the commit author. `name.surname@…` becomes `Name Surname`; any other email keeps the part before `@` as is.
 4. Reads the template files (skipping `.git`, `.github`, `node_modules`, …) and fills the placeholders in `workflow_settings.yaml`.
 5. Prints the plan. With `--dry-run` it stops here, and steps 2–3 are skipped.
 6. Checks the Dataform repo and creates it if it is missing (`--create`, on by default). With `--service-account`, sets it as the repo's service account (also on existing repos).

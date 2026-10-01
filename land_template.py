@@ -36,7 +36,6 @@ from google.auth.transport.requests import AuthorizedSession
 DATAFORM = "https://dataform.googleapis.com/v1"
 BIGQUERY = "https://bigquery.googleapis.com/bigquery/v2"
 SKIP = {".git", ".github", "node_modules", ".df-credentials.json", ".DS_Store"}
-AUTHOR_NAME = "template-lander"
 SOURCE_RE = re.compile(r"^(?P<project>[a-z][a-z0-9-]{4,28}[a-z0-9])\.analytics_(?P<pid>\d+)$")
 
 
@@ -96,6 +95,13 @@ def caller_email(s: AuthorizedSession, creds) -> str:
     sys.exit("cannot detect your email from the gcloud credentials")
 
 
+def author_name(email: str) -> str:
+    """name.surname@… -> "Name Surname"; any other local part is kept as is."""
+    local = email.split("@")[0]
+    parts = local.split(".")
+    return " ".join(p.capitalize() for p in parts) if len(parts) == 2 and all(parts) else local
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("template_dir", type=pathlib.Path)
@@ -122,7 +128,7 @@ def main() -> None:
     parent = f"projects/{df_project}/locations/{a.region}"
     repo = f"{parent}/repositories/{repo_id}"
 
-    s, author_email = None, "<your gcloud identity>"
+    s, author, author_email = None, "<you>", "<your gcloud identity>"
     if not a.dry_run:
         creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         s = AuthorizedSession(creds)
@@ -131,6 +137,7 @@ def main() -> None:
             sys.exit(f"source is in {src_location}, --bq-location is {a.bq_location}: "
                      f"pass --bq-location {src_location}")
         author_email = caller_email(s, creds)
+        author = author_name(author_email)
 
     subs = {
         "<project_id>": data_project,
@@ -142,7 +149,7 @@ def main() -> None:
     print(f"source  {data_project}.{ga4_dataset}  ({a.bq_location})")
     print(f"output  {data_project}.{output_dataset}")
     print(f"repo    {repo}")
-    print(f"author  {AUTHOR_NAME} <{author_email}>")
+    print(f"author  {author} <{author_email}>")
     print(f"sa      {a.service_account or '<Dataform service agent>'}")
     print(f"files   {len(files)}")
     if a.dry_run:
@@ -176,7 +183,7 @@ def main() -> None:
 
     r = s.post(f"{DATAFORM}/{repo}:commit", json={
         "commitMetadata": {
-            "author": {"name": AUTHOR_NAME, "emailAddress": author_email},
+            "author": {"name": author, "emailAddress": author_email},
             "commitMessage": f"Land template-shared-ga4-dataform for {data_project}.{ga4_dataset}",
         },
         "fileOperations": ops,
