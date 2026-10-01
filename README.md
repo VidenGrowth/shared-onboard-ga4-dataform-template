@@ -13,6 +13,17 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 | Dataform region | `us-central1` (change with `--region`) |
 | BigQuery location | `US`, checked against the source dataset's actual location |
 
+## What the script does
+
+1. Reads the project and property ID from `--source` and builds all names from them.
+2. Looks up the source dataset in BigQuery and stops if its location differs from `--bq-location`.
+3. Detects your gcloud email, which is used as the commit author.
+4. Reads the template files (skipping `.git`, `.github`, `node_modules`, …) and fills the placeholders in `workflow_settings.yaml`.
+5. Prints the plan. With `--dry-run` it stops here, and steps 2–3 are skipped.
+6. Checks the Dataform repo and creates it if it is missing (`--create`, on by default).
+7. With `--sync`, lists the repo files and marks those not in the template for deletion.
+8. Writes everything in one commit and prints the commit SHA.
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) and the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
