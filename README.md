@@ -36,12 +36,26 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 
 ## Quickstart
 
-### 1. Clone both repos
+### 1. Clone and sync the repos
+
+Clone this repo, then run `sync_repos.sh` to clone the template next to it:
 
 ```bash
 git clone https://github.com/VidenGrowth/shared-onboard-ga4-dataform-template
-git clone https://github.com/VidenGrowth/template-shared-ga4-dataform
+cd shared-onboard-ga4-dataform-template
+./sync_repos.sh
 ```
+
+`sync_repos.sh` keeps both repos (`shared-onboard-ga4-dataform-template` and `template-shared-ga4-dataform`) up to date. Run it again any time to get the latest changes:
+
+- A repo that is missing is cloned. A repo that is already cloned is pulled with `git pull --ff-only`, so it never creates merge commits.
+- If a pull fails, for example because of local changes or a branch that differs from `origin`, the script stops and suggests `--force`. The other repo is still synced.
+- If a folder with the repo's name exists but is not a git repo, the script stops for that repo and does not touch the folder.
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--dir <path>` | Parent folder of this repo | Folder to clone into and sync |
+| `--force`, `-f` | off | If a pull fails, reset the repo to the `origin` default branch. **This drops local commits, uncommitted changes and untracked files.** Files in `.gitignore` are kept |
 
 ### 2. Check the template config
 
@@ -137,7 +151,7 @@ The rates table is in `US`, so outside `US` use `--no-add-rates` instead of `--a
 ## Updating a client after template changes
 
 ```bash
-cd ../template-shared-ga4-dataform && git pull && cd -
+./sync_repos.sh
 uv run land_template.py ../template-shared-ga4-dataform \
   --source <project>.analytics_<property_id> --repo-location <repo-location> \
   --time-zone <time-zone> --sync
