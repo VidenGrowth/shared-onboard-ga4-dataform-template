@@ -19,7 +19,7 @@ Placeholders replaced in every text file (the template's workflow_settings.yaml)
 The output dataset is derived by the template itself (includes/constants.js).
 
   uv run land_template.py ./template-shared-ga4-dataform \
-      --source <project>.analytics_<property_id> --region <region>
+      --source <project>.analytics_<property_id> --repo-location <repo-location>
       # add --bq-location <loc> if the source is not in US
 """
 from __future__ import annotations
@@ -106,7 +106,7 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("template_dir", type=pathlib.Path)
     p.add_argument("--source", required=True, help="GA4 export, <project>.analytics_<property_id>")
-    p.add_argument("--region", default="us-central1", help="Dataform region")
+    p.add_argument("--repo-location", default="us-central1", help="Dataform region, e.g. us-central1 (not US)")
     p.add_argument("--project", help="Dataform project (default: source project)")
     p.add_argument("--bq-location", default="US", help="BigQuery location (checked against source)")
     p.add_argument("--repo", help="default: ga4_data_processing_<property_id>")
@@ -125,7 +125,7 @@ def main() -> None:
     output_dataset = f"analytics_processed_data_{pid}"
     repo_id = a.repo or f"ga4_data_processing_{pid}"
     df_project = a.project or data_project
-    parent = f"projects/{df_project}/locations/{a.region}"
+    parent = f"projects/{df_project}/locations/{a.repo_location}"
     repo = f"{parent}/repositories/{repo_id}"
 
     s, author, author_email = None, "<you>", "<your gcloud identity>"

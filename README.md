@@ -10,7 +10,7 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 | Output dataset | `<project>.analytics_processed_data_<property_id>` |
 | Dataform repo ID | `ga4_data_processing_<property_id>` |
 | Dataform project | Same as the source project |
-| Dataform region | `us-central1` (change with `--region`) |
+| Dataform repo location | `us-central1` (change with `--repo-location`) |
 | BigQuery location | `US`, checked against the source dataset's actual location |
 
 ## What the script does
@@ -76,7 +76,7 @@ gcloud auth application-default login
 cd shared-onboard-ga4-dataform-template
 uv run land_template.py ../template-shared-ga4-dataform \
   --source <project>.analytics_<property_id> \
-  --region <region> \
+  --repo-location <repo-location> \
   --dry-run
 ```
 
@@ -87,7 +87,7 @@ Check the names it prints and the list of files.
 ```bash
 uv run land_template.py ../template-shared-ga4-dataform \
   --source <project>.analytics_<property_id> \
-  --region <region>
+  --repo-location <repo-location>
 ```
 
 The repository is created if it does not exist yet (`--create` is on by default; pass `--no-create` to only update existing repos); otherwise a new commit is added on top. Add `--sync` to also delete repo files that are not in the template.
@@ -96,7 +96,7 @@ If the source dataset is not in `US`, the script stops before writing anything a
 
 ### 6. Verify
 
-1. In the BigQuery console, go to **Dataform** → `<region>` → `ga4_data_processing_<property_id>`.
+1. In the BigQuery console, go to **Dataform** → `<repo-location>` → `ga4_data_processing_<property_id>`.
 2. Open the commit history and confirm there is a commit named *Land template-shared-ga4-dataform …*.
 3. Create a development workspace and check that the project compiles.
 4. Before scheduling runs, make sure the account that runs workflows has `roles/bigquery.jobUser` and `roles/bigquery.dataEditor`. That is the service account from `--service-account`, or else the Dataform service agent (`service-<project_number>@gcp-sa-dataform.iam.gserviceaccount.com`).
@@ -106,7 +106,7 @@ If the source dataset is not in `US`, the script stops before writing anything a
 ```bash
 cd ../template-shared-ga4-dataform && git pull && cd -
 uv run land_template.py ../template-shared-ga4-dataform \
-  --source <project>.analytics_<property_id> --region <region> --sync
+  --source <project>.analytics_<property_id> --repo-location <repo-location> --sync
 ```
 
 This writes one new commit on top of the existing history.
@@ -116,7 +116,7 @@ This writes one new commit on top of the existing history.
 | Flag | Default | Notes |
 |---|---|---|
 | `--source` | required | `<project>.analytics_<property_id>` |
-| `--region` | `us-central1` | Dataform region |
+| `--repo-location` | `us-central1` | Dataform region, e.g. `us-central1`, `europe-west1` (not `US`/`EU`) |
 | `--project` | Source project | Dataform project, if it differs |
 | `--bq-location` | `US` | Must match the source dataset |
 | `--repo` | `ga4_data_processing_<property_id>` | |
