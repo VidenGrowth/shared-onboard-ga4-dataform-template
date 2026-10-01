@@ -20,7 +20,7 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 3. Detects your gcloud email, which is used as the commit author.
 4. Reads the template files (skipping `.git`, `.github`, `node_modules`, …) and fills the placeholders in `workflow_settings.yaml`.
 5. Prints the plan. With `--dry-run` it stops here, and steps 2–3 are skipped.
-6. Checks the Dataform repo and creates it if it is missing (`--create`, on by default).
+6. Checks the Dataform repo and creates it if it is missing (`--create`, on by default). With `--service-account`, sets it as the repo's service account (also on existing repos).
 7. With `--sync`, lists the repo files and marks those not in the template for deletion.
 8. Writes everything in one commit and prints the commit SHA.
 
@@ -30,6 +30,9 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
 - Permissions in the target project:
   - Dataform: `roles/dataform.admin`, or a role that grants `dataform.repositories.get`, `dataform.repositories.create` (new repos only) and `dataform.repositories.commit`
   - BigQuery: `bigquery.datasets.get` on the source dataset (for example `roles/bigquery.metadataViewer`)
+- With `--service-account`:
+  - You: `roles/iam.serviceAccountUser` on that service account, plus `dataform.repositories.update` for existing repos
+  - Dataform service agent (`service-<project_number>@gcp-sa-dataform.iam.gserviceaccount.com`): `roles/iam.serviceAccountTokenCreator` on that service account
 
 ## Step by step
 
@@ -96,7 +99,7 @@ If the source dataset is not in `US`, the script stops before writing anything a
 1. In the BigQuery console, go to **Dataform** → `<region>` → `ga4_data_processing_<property_id>`.
 2. Open the commit history and confirm there is a commit named *Land template-shared-ga4-dataform …*.
 3. Create a development workspace and check that the project compiles.
-4. Make sure the Dataform service agent (`service-<project_number>@gcp-sa-dataform.iam.gserviceaccount.com`) has `roles/bigquery.jobUser` and `roles/bigquery.dataEditor`, or set a custom service account on the repo, before scheduling runs.
+4. Before scheduling runs, make sure the account that runs workflows has `roles/bigquery.jobUser` and `roles/bigquery.dataEditor`. That is the service account from `--service-account`, or else the Dataform service agent (`service-<project_number>@gcp-sa-dataform.iam.gserviceaccount.com`).
 
 ## Updating a client after template changes
 
@@ -117,6 +120,7 @@ This writes one new commit on top of the existing history.
 | `--project` | Source project | Dataform project, if it differs |
 | `--bq-location` | `US` | Must match the source dataset |
 | `--repo` | `ga4_data_processing_<property_id>` | |
+| `--service-account` | Dataform service agent | Service account email that runs the repo's workflows |
 | `--create` / `--no-create` | on | Create the repo if it does not exist |
 | `--sync` | off | Delete repo files that are not in the template |
 | `--dry-run` | off | Print the plan only |

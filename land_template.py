@@ -104,6 +104,7 @@ def main() -> None:
     p.add_argument("--project", help="Dataform project (default: source project)")
     p.add_argument("--bq-location", default="US", help="BigQuery location (checked against source)")
     p.add_argument("--repo", help="default: ga4_data_processing_<property_id>")
+    p.add_argument("--service-account", help="SA email that runs workflows (default: Dataform service agent)")
     p.add_argument("--create", action=argparse.BooleanOptionalAction, default=True,
                    help="create repo if missing (default: on)")
     p.add_argument("--sync", action="store_true", help="delete files absent in template")
@@ -142,6 +143,7 @@ def main() -> None:
     print(f"output  {data_project}.{output_dataset}")
     print(f"repo    {repo}")
     print(f"author  {AUTHOR_NAME} <{author_email}>")
+    print(f"sa      {a.service_account or '<Dataform service agent>'}")
     print(f"files   {len(files)}")
     if a.dry_run:
         print("\n".join(f"  {f}" for f in files))
@@ -149,8 +151,10 @@ def main() -> None:
 
     r = s.get(f"{DATAFORM}/{repo}")
     if r.status_code == 404 and a.create:
-        r = s.post(f"{DATAFORM}/{parent}/repositories", params={"repositoryId": repo_id},
-                   json={"setAuthenticatedUserAdmin": True})
+        body = {"setAuthenticatedUserAdmin": True}
+        if a.service_account:
+            body["serviceAccount"] = a.service_account
+        r = s.post(f"{DATAFORM}/{parent}/repositories", params={"repositoryId": repo_id}, json=body)
         if not r.ok:
             sys.exit(f"create failed: {r.status_code} {r.text}")
         print(f"created {repo}")
@@ -158,6 +162,12 @@ def main() -> None:
         sys.exit(f"{repo} does not exist; drop --no-create to create it")
     elif not r.ok:
         sys.exit(f"cannot read repo: {r.status_code} {r.text}")
+    elif a.service_account and r.json().get("serviceAccount") != a.service_account:
+        r = s.patch(f"{DATAFORM}/{repo}", params={"updateMask": "serviceAccount"},
+                    json={"serviceAccount": a.service_account})
+        if not r.ok:
+            sys.exit(f"cannot set service account: {r.status_code} {r.text}")
+        print(f"service account set to {a.service_account}")
 
     ops = {path: {"writeFile": {"contents": base64.b64encode(data).decode()}}
            for path, data in files.items()}
