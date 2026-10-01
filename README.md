@@ -34,7 +34,7 @@ Every name is built from the GA4 export dataset, so all clients follow the same 
   - You: `roles/iam.serviceAccountUser` on that service account, plus `dataform.repositories.update` for existing repos
   - Dataform service agent (`service-<project_number>@gcp-sa-dataform.iam.gserviceaccount.com`): `roles/iam.serviceAccountTokenCreator` on that service account
 
-## Step by step
+## Quickstart
 
 ### 1. Clone both repos
 
@@ -96,6 +96,36 @@ uv run land_template.py ../template-shared-ga4-dataform \
 The repository is created if it does not exist yet (`--create` is on by default; pass `--no-create` to only update existing repos); otherwise a new commit is added on top. Add `--sync` to also delete repo files that are not in the template.
 
 If the source dataset is not in `US`, the script stops before writing anything and prints the `--bq-location` value to pass.
+
+A detailed run that sets every option looks like this:
+
+```bash
+uv run land_template.py ../template-shared-ga4-dataform \
+  --source <project>.analytics_<property_id> \
+  --project <dataform-project> \
+  --repo <repo-id> \
+  --repo-location <repo-location> \
+  --bq-location <bq-location> \
+  --service-account <service-account> \
+  --time-zone <time-zone> \
+  --add-rates \
+  --rates-currencies <currencies> \
+  --sync
+```
+
+| Placeholder | Example |
+|---|---|
+| `<project>` | `my-client-project` |
+| `<property_id>` | `123456789` |
+| `<dataform-project>` | `my-client-project` (omit to use the source project) |
+| `<repo-id>` | `ga4_data_processing_123456789` (omit to use this default) |
+| `<repo-location>` | `us-central1` |
+| `<bq-location>` | `US` |
+| `<service-account>` | `dataform-runner@my-client-project.iam.gserviceaccount.com` |
+| `<time-zone>` | `America/New_York` |
+| `<currencies>` | `EUR,GBP` |
+
+The rates table is in `US`, so outside `US` use `--no-add-rates` instead of `--add-rates`. Add `--dry-run` to check the plan before writing.
 
 ### 6. Verify
 
